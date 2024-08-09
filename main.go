@@ -47,9 +47,31 @@ func handleGrowtopia(w *http.ResponseWriter) chromedp.Tasks {
 			}
 			if len(nodes) > 0 {
 				chromedp.SendKeys(`//*[@id="login-name"]`, generateRandomName(), chromedp.BySearch).Do(ctx)
-				chromedp.Sleep(1)
+				chromedp.Sleep(1 * time.Second)
 				chromedp.Click(`//*[@id="modalShow"]/div/div/div/div/section/div/div[2]/div/form/div[2]/input`, chromedp.BySearch).Do(ctx)
-				chromedp.Sleep(1)
+				chromedp.Sleep(1 * time.Second)
+				chromedp.WaitReady(`body`).Do(ctx)
+			}
+
+			var nodes2 []*cdp.Node
+			err = chromedp.Nodes(`//*[@id="profile-conflict"]/div[3]/a/div/div[2]/button`, &nodes2, chromedp.AtLeast(0)).Do(ctx)
+			if err != nil {
+				return err
+			}
+			if len(nodes2) > 0 {
+				chromedp.Click(`//*[@id="profile-conflict"]/div[3]/a/div/div[2]/button`, chromedp.BySearch).Do(ctx)
+				chromedp.Sleep(1 * time.Second)
+				chromedp.WaitReady(`body`).Do(ctx)
+			}
+
+			var nodes3 []*cdp.Node
+			err = chromedp.Nodes(`//*[@id="modalShow"]/div/div/div/div/section/div/div[2]/div/div[3]/a`, &nodes3, chromedp.AtLeast(0)).Do(ctx)
+			if err != nil {
+				return err
+			}
+			if len(nodes3) > 0 {
+				chromedp.Click(`//*[@id="modalShow"]/div/div/div/div/section/div/div[2]/div/div[3]/a`, chromedp.BySearch).Do(ctx)
+				chromedp.Sleep(1 * time.Second)
 				chromedp.WaitReady(`body`).Do(ctx)
 			}
 
@@ -169,9 +191,10 @@ func handler(url, email, password string, w *http.ResponseWriter, handlerCtx con
 	go func() {
 		opts := []chromedp.ExecAllocatorOption{
 			// chromedp.Headless,
-			chromedp.UserDataDir("storage"),
 			chromedp.UserAgent("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36"),
 			chromedp.NoDefaultBrowserCheck,
+			chromedp.NoFirstRun,
+			chromedp.Flag("disable-extensions", true),
 			chromedp.Flag("excludeSwitches", "enable-automation"),
 			chromedp.Flag("disable-blink-features", "AutomationControlled"),
 			chromedp.Flag("lang", "en-US"),
@@ -185,7 +208,7 @@ func handler(url, email, password string, w *http.ResponseWriter, handlerCtx con
 		)
 		defer cancel()
 
-		ctx, cancel = context.WithTimeout(ctx, 30*time.Second)
+		ctx, cancel = context.WithTimeout(ctx, 60*time.Second)
 		defer cancel()
 
 		err := chromedp.Run(ctx, handleGoogle(url, email, password, w))
