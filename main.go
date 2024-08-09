@@ -2,6 +2,8 @@ package main
 
 import (
 	"context"
+	"crypto/rand"
+	"encoding/hex"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -14,26 +16,51 @@ import (
 	"github.com/go-rod/stealth"
 )
 
-func handleGoogleLoginForm(email, password string, w *http.ResponseWriter) chromedp.Tasks {
+func generateRandomName() string {
+	bytes := make([]byte, 4)
+	if _, err := rand.Read(bytes); err != nil {
+		panic(err)
+	}
+	return hex.EncodeToString(bytes)[:7]
+}
+
+func handleGrowtopia(w *http.ResponseWriter) chromedp.Tasks {
 	return chromedp.Tasks{
-		chromedp.SendKeys(`//*[@id="identifierId"]`, email, chromedp.BySearch),
-		chromedp.Click(`//*[@id="identifierNext"]/div/button/span`, chromedp.BySearch),
-		chromedp.WaitVisible(`//*[@id="password"]/div[1]/div/div[1]/input`, chromedp.BySearch),
-		chromedp.Sleep(3 * time.Second),
-		chromedp.SendKeys(`//*[@id="password"]/div[1]/div/div[1]/input`, password, chromedp.BySearch),
-		chromedp.Click(`//*[@id="passwordNext"]/div/button/span`, chromedp.BySearch),
-		chromedp.Sleep(3 * time.Second),
-		chromedp.WaitReady(`body`),
-		chromedp.Sleep(3 * time.Second),
 		chromedp.ActionFunc(func(ctx context.Context) error {
+			var nodes []*cdp.Node
+			err := chromedp.Nodes(`//*[@id="yDmH0d"]/c-wiz/div/div[3]/div/div/div[2]/div/div/button`, &nodes, chromedp.AtLeast(0)).Do(ctx)
+			if err != nil {
+				return err
+			}
+			if len(nodes) > 0 {
+				chromedp.Click(`//*[@id="yDmH0d"]/c-wiz/div/div[3]/div/div/div[2]/div/div/button`, chromedp.BySearch).Do(ctx)
+				chromedp.Sleep(1)
+				chromedp.WaitReady(`body`).Do(ctx)
+			}
+			return nil
+		}),
+		chromedp.ActionFunc(func(ctx context.Context) error {
+			var nodes []*cdp.Node
+			err := chromedp.Nodes(`//*[@id="login-name"]`, &nodes, chromedp.AtLeast(0)).Do(ctx)
+			if err != nil {
+				return err
+			}
+			if len(nodes) > 0 {
+				chromedp.SendKeys(`//*[@id="login-name"]`, generateRandomName(), chromedp.BySearch).Do(ctx)
+				chromedp.Sleep(1)
+				chromedp.Click(`//*[@id="modalShow"]/div/div/div/div/section/div/div[2]/div/form/div[2]/input`, chromedp.BySearch).Do(ctx)
+				chromedp.Sleep(1)
+				chromedp.WaitReady(`body`).Do(ctx)
+			}
+
 			var bodyContent string
-			err := chromedp.InnerHTML("body", &bodyContent).Do(ctx)
+			err = chromedp.InnerHTML("body", &bodyContent).Do(ctx)
 			if err != nil {
 				return err
 			}
 
 			if contains := strings.Contains(bodyContent, "too many people"); contains {
-				http.Error(*w, "Too many people are using this account right now. Please try again later.", http.StatusTooManyRequests)
+				http.Error(*w, "Too many people trying to logon", http.StatusTooManyRequests)
 				return nil
 			}
 
@@ -55,40 +82,27 @@ func handleGoogleLoginForm(email, password string, w *http.ResponseWriter) chrom
 	}
 }
 
+func handleGoogleLoginForm(email, password string, w *http.ResponseWriter) chromedp.Tasks {
+	return chromedp.Tasks{
+		chromedp.SendKeys(`//*[@id="identifierId"]`, email, chromedp.BySearch),
+		chromedp.Click(`//*[@id="identifierNext"]/div/button/span`, chromedp.BySearch),
+		chromedp.WaitVisible(`//*[@id="password"]/div[1]/div/div[1]/input`, chromedp.BySearch),
+		chromedp.Sleep(1 * time.Second),
+		chromedp.SendKeys(`//*[@id="password"]/div[1]/div/div[1]/input`, password, chromedp.BySearch),
+		chromedp.Click(`//*[@id="passwordNext"]/div/button/span`, chromedp.BySearch),
+		chromedp.Sleep(1 * time.Second),
+		chromedp.WaitReady(`body`),
+		chromedp.Sleep(1 * time.Second),
+		handleGrowtopia(w),
+	}
+}
+
 func handleClickOnEmail(email string, w *http.ResponseWriter) chromedp.Tasks {
 	return chromedp.Tasks{
 		chromedp.Click(`//li/div[@data-identifier='`+email+`']`, chromedp.BySearch),
 		chromedp.WaitReady("body"),
-		chromedp.Sleep(3 * time.Second),
-		chromedp.WaitReady(`body`),
-		chromedp.Sleep(3 * time.Second),
-		chromedp.ActionFunc(func(ctx context.Context) error {
-			var bodyContent string
-			err := chromedp.InnerHTML("body", &bodyContent).Do(ctx)
-			if err != nil {
-				return err
-			}
-
-			if contains := strings.Contains(bodyContent, "too many people"); contains {
-				http.ResponseWriter.Write(*w, []byte("Too many people are using this account right now. Please try again later."))
-				return nil
-			}
-
-			var jsonData map[string]interface{}
-			err = json.Unmarshal([]byte(bodyContent), &jsonData)
-			if err != nil {
-				return err
-			}
-
-			token, ok := jsonData["token"].(string)
-			if !ok {
-				http.ResponseWriter.Write(*w, []byte("Token not found in the response"))
-				return nil
-			}
-
-			http.ResponseWriter.Write(*w, []byte(token))
-			return nil
-		}),
+		chromedp.Sleep(1 * time.Second),
+		handleGrowtopia(w),
 	}
 }
 
@@ -96,7 +110,7 @@ func handleGoogle(url, email, password string, w *http.ResponseWriter) chromedp.
 	return chromedp.Tasks{
 		chromedp.EvaluateAsDevTools(stealth.JS, nil),
 		chromedp.Navigate(url),
-		chromedp.Sleep(3 * time.Second),
+		chromedp.WaitReady("body"),
 		chromedp.ActionFunc(func(ctx context.Context) error {
 			var bodyContent string
 			err := chromedp.InnerHTML("body", &bodyContent).Do(ctx)
