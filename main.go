@@ -1,7 +1,6 @@
 package main
 
 import (
-	"context"
 	"crypto/rand"
 	"encoding/hex"
 	"encoding/json"
@@ -16,6 +15,7 @@ import (
 	"github.com/go-rod/rod"
 	"github.com/go-rod/rod/lib/launcher"
 	"github.com/go-rod/rod/lib/launcher/flags"
+	"github.com/go-rod/rod/lib/proto"
 	"github.com/ysmood/leakless/pkg/utils"
 )
 
@@ -279,11 +279,10 @@ func setupBrowser(url string, task TaskRequest) (string, error) {
 				domain := parts[0]
 				path := parts[2]
 				secure := parts[3] == "TRUE"
-				expires := parts[4]
 				name := parts[5]
 				value := parts[6]
 				
-				cookie := &rod.Cookie{
+				cookie := &proto.NetworkCookieParam{
 					Domain:   domain,
 					Path:     path,
 					Secure:   secure,
@@ -291,7 +290,7 @@ func setupBrowser(url string, task TaskRequest) (string, error) {
 					Value:    value,
 				}
 				
-				page.SetCookies([]*rod.Cookie{cookie})
+				page.SetCookies([]*proto.NetworkCookieParam{cookie})
 			}
 		}
 	}
