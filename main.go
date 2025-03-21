@@ -251,13 +251,15 @@ func setupBrowser(url string, task TaskRequest) (string, error) {
 		Set("--lang", "en-US").
 		Set("--user-agent", "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36")
 	
-	// Set up proxy if provided
 	if task.Proxy.Data != "" && task.Proxy.Protocol != "" {
 		proxyParts := strings.Split(task.Proxy.Data, "@")
 		if len(proxyParts) == 2 {
 			proxyServer := proxyParts[1]
-			proxyAuth := strings.Replace(proxyParts[0], ":", "//", 1)
+			proxyAuth := proxyParts[0]
 			proxyURL := fmt.Sprintf("%s://%s@%s", task.Proxy.Protocol, proxyAuth, proxyServer)
+			l.Set("--proxy-server", proxyURL)
+		} else {
+			proxyURL := fmt.Sprintf("%s://%s", task.Proxy.Protocol, task.Proxy.Data)
 			l.Set("--proxy-server", proxyURL)
 		}
 	}
@@ -404,7 +406,6 @@ func handleGetTaskResult(w http.ResponseWriter, r *http.Request) {
 }
 
 func main() {
-	// Legacy endpoint for backward compatibility with mori
 	http.HandleFunc("/token", func(w http.ResponseWriter, r *http.Request) {
 		if r.Method == "POST" {
 			r.ParseForm()
@@ -431,13 +432,10 @@ func main() {
 		}
 	})
 	
-	// New endpoint for lucifer
 	http.HandleFunc("/createTask", handleCreateTaskRequest)
 	
-	// Endpoint for getting task results
 	http.HandleFunc("/getTaskResult", handleGetTaskResult)
 	
-	// Root endpoint
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		w.Write([]byte("Available endpoints: /token, /createTask, /getTaskResult"))
 	})
